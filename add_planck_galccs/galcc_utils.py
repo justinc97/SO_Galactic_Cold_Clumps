@@ -48,11 +48,22 @@ def arclength_sphere(theta, phi, theta_cent, phi_cent):
     
     return psi
 
-def gaussian_source(pixel, size):
+def gaussian_source_circ(pixel, radius):
     """
         Create a gaussian to represent spreading/smoothing of flux across source size
     """
-    sig = (size) / np.sqrt(8 * np.log(2))
+    sig = (radius) / np.sqrt(8 * np.log(2))
+
     exp = (pixel / (np.sqrt(2) * sig)) ** 2
     
     return np.exp(-exp)
+
+def gaussian_source(theta_set, phi_set, a, b, rot):
+    theta_pix, theta_cent = theta_set
+    phi_pix, phi_cent = phi_set
+    siga = a / np.sqrt(8 * np.log(2))
+    sigb = b / np.sqrt(8 * np.log(2))
+
+    A = ((theta_pix - theta_cent) * np.cos(rot) - (phi_pix - phi_cent) * np.sin(rot)) / (siga)
+    B = ((theta_pix - theta_cent) * np.sin(rot) + (phi_pix - phi_cent) * np.cos(rot)) / (sigb)
+    return np.exp(-0.5 * (A**2 + B**2))
