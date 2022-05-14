@@ -66,3 +66,11 @@ def gaussian_source(theta_set, phi_set, a, b, rot):
     A = (phi_pix - phi_cent) * np.cos(rot) - (theta_pix - theta_cent) * np.sin(rot)
     B = (phi_pix - phi_cent) * np.sin(rot) + (theta_pix - theta_cent) * np.cos(rot) 
     return np.exp(-0.5 * ((A**2 / (siga**2)) + (B**2 / (sigb**2))))
+
+
+def map_unit_conversion(m, output_units):
+    if output_units == u.uK_CMB or output_units == u.K_CMB:
+        m = (m).to_value(output_units, equivalencies = u.cmb_equivalencies(freq_out * u.GHz))
+    else:
+        m = (m).to_value(output_units)
+    return m

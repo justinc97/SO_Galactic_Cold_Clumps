@@ -18,7 +18,6 @@ def modBB(F0, T, v, v0, b):
         -----Outputs-----
         F    : Flux scaled to frequency out
     """
-    per_pixel_steradian = 1 / hp.nside2pixarea(2048) # From Planck map sizes
     bb = BlackBody(temperature = T * u.K)
     Bnu = bb(v) 
     Bnu0 = bb(v0)
@@ -48,55 +47,30 @@ def arclength_sphere(theta, phi, theta_cent, phi_cent):
     
     return psi
 
-#def gaussian_source(pixel, fwhm_maj, fwhm_min):
+def gaussian_source_circ(pixel, radius):
     """
         Create a gaussian to represent spreading/smoothing of flux across source size
     """
-    #sig_maj = (fwhm_maj) / np.sqrt(8 * np.log(2))
-    #sig_min = (fwhm_min) / np.sqrt(8 * np.log(2))
+    sig = (radius) / np.sqrt(8 * np.log(2))
 
-    #exp = (pixel / (np.sqrt(2) * sig_maj)) ** 2 + (pixel / (np.sqrt(2) * sig_min)) ** 2
+    exp = (pixel / (np.sqrt(2) * sig)) ** 2
     
-    #return np.exp(-exp)
+    return np.exp(-exp)
 
 def gaussian_source(theta_set, phi_set, a, b, rot):
-    theta_pix, theta_cent = theta_set
     phi_pix, phi_cent = phi_set
+    theta_pix, theta_cent = theta_set
     siga = a / np.sqrt(8 * np.log(2))
     sigb = b / np.sqrt(8 * np.log(2))
-    
-    """
-    x = ((np.cos(rot)**2) / (2 * siga**2)) + ((np.sin(rot)**2) / (2 * sigb**2))
-    y = -(np.sin(2 * rot)) / (4 * siga**2)  + (np.sin(2 * rot)) / (4 * sigb**2)
-    z = (np.sin(rot)**2) / (2 * siga**2) + (np.cos(rot)**2) / (2 * sigb**2)
-    g = np.exp(-(x * ((theta_pix - theta_cent)**2) + 2 * y * (theta_pix - theta_cent) * (phi_pix - phi_cent) + z * ((phi_pix - phi_cent)**2)))
-    return g
-  """
-    A = ((theta_pix - theta_cent) * np.cos(rot) - (phi_pix - phi_cent) * np.sin(rot)) / (siga)
-    B = ((theta_pix - theta_cent) * np.sin(rot) + (phi_pix - phi_cent) * np.cos(rot)) / (sigb)
-    return np.exp(-0.5 * (A**2 + B**2))
-"""
-def gaussian_source(theta_set, phi_set, a, b, pa):
-    theta_pix, theta_c = theta_set
-    phi_pix, phi_c = phi_set
-    sigma_maj = a / np.sqrt(8 * np.log(2))
-    sigma_min = b / np.sqrt(8 * np.log(2))
-    
-    A = ((theta_pix - theta_c)**2) / (2 * sigma_maj**2)
-    B = (pa * (theta_pix - theta_c) * (phi_pix - phi_c)) / (sigma_maj * sigma_min)
-    C = ((phi_pix - phi_c)**2) / (2 * sigma_min**2)
-    G = np.exp(-A-B-C)
-    return G
 
-def gaussian_source(theta_set, phi_set, a, b, pa):
-    theta_pix, theta_c = theta_set
-    phi_pix, phi_c = phi_set
-    sigma_maj = a / np.sqrt(8 * np.log(2))
-    sigma_min = b / np.sqrt(8 * np.log(2))
-    
-    A = (theta_pix - theta_c) * np.cos(pa) + (phi_pix - phi_c) * np.cos(pa)
-    B = (theta_pix - theta_c) * np.sin(pa) + (phi_pix - phi_c) * np.cos(pa) 
-    G = (A / sigma_maj) ** 2 + (B / sigma_min) ** 2
-    return np.exp(-0.5 * G)
-    
-    """
+    A = (phi_pix - phi_cent) * np.cos(rot) - (theta_pix - theta_cent) * np.sin(rot)
+    B = (phi_pix - phi_cent) * np.sin(rot) + (theta_pix - theta_cent) * np.cos(rot) 
+    return np.exp(-0.5 * ((A**2 / (siga**2)) + (B**2 / (sigb**2))))
+
+
+def map_unit_conversion(m, output_units):
+    if output_units == u.uK_CMB or output_units == u.K_CMB:
+        m = (m).to_value(output_units, equivalencies = u.cmb_equivalencies(freq_out * u.GHz))
+    else:
+        m = (m).to_value(output_units)
+    return m

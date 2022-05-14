@@ -6,84 +6,119 @@ import os
 from .galcc_utils import (modBB, 
                           arclength_sphere, 
                           gaussian_source,
-                          gaussian_source_circ
+                          gaussian_source_circ,
+                          map_unit_conversion
 )
 
 
-class galcc_mapper(object):
-    def __init__(self):
-        self.nside = 0
-        self.npix = 0
-        self.map = None
-        self.per_pix_steradian = 0 
-        
-    def galcc_map(self, catalogue, freq_out, nside, output_units = u.uK_CMB, 
-                  shape_circ = False, store_maps = False, outdir = "", ):
+class build_galactic_clump_map(object):
+    def __init__(self, nside, catalogue, b_range = None):
         self.nside = nside
         self.npix = hp.nside2npix(self.nside)
-        self.per_pix_steradian = 1 / hp.nside2pixarea(self.nside) # 1/sr
-        # Build empty map
         self.map = np.zeros(self.npix, dtype = np.float64)
-        
-        # Check catalogue exists in working directory
+        self.per_pix_steradian = 1 / (hp.nside2pixarea(self.nside))
+
         try:
             df = pd.read_csv(catalogue)
         except:
             print("Catalogue not in working directory: ", os.getcwd() + catalogue)
             return
-        # Restrict sources to flux_quality = 1 so T and beta are available
+        # Restrict PGCC sources to flux_quality = 1 ensuring they have a measured
+        # T and beta value
         df = df[df.flux_quality == 1]
+        
+        if b_range is not None:
+            b_min = b_range[0]
+            b_max = b_range[1]
+            # Restrict sources under |b| > 30 for SO Visible
+            df = df[df['glat'] < b_max]
+            df = df[df['glat'] > b_min]
+
+        
         df = df.reset_index(drop = True)
-        nsources = len(df)
         
-        # Original flux values at 353 GHz
-        planck_flux = df['flux_353_clump']
+        self.Nsources = len(df)
+        self.df = df
         
-        # Scale flux to desired frequency out
-        if freq_out is not None:
-            scaled_flux = modBB(planck_flux, np.array(df['temp_clump']), freq_out, 353, np.array(df['beta_clump']))
-        else: 
-            scaled_flux = planck_flux
-            freq_out = 353
+        # Read spectral and flux properties
+        self.temperatures = np.array(df['temp_clump'])
+        self.betas        = np.array(df['beta_clump'])
+        self.flux_353     = np.array(df['flux_353_clump'])
+        self.flux_545     = np.array(df['flux_545_clump'])
+        self.flux_857     = np.array(df['flux_857_clump'])
         
-        # Add sources to map at given locations with appropriate size and Gaussian flux distribution
+        # Read source position, shape and orientation
         vecs = hp.ang2vec(df['glon'], df['glat'], lonlat = True)
         FWHM_maj = (np.array(df['gau_major_axis']) * u.arcmin).to_value(u.rad)
         FWHM_min = (np.array(df['gau_minor_axis']) * u.arcmin).to_value(u.rad)
-        pos_ang = df['gau_position_angle'] # rad
+        pos_ang = df['gau_position_angle']
         
-        for i in range(nsources):
+        profiles = []
+        sources = []
+        for i in range(self.Nsources):
             pix_circ = hp.query_disc(nside = self.nside, vec = vecs[i],
                                      radius = 3 * FWHM_maj[i])
             theta_pix, phi_pix = hp.pix2ang(self.nside, pix_circ)
             theta_cent, phi_cent = hp.vec2ang(vecs[i])
-            
-            if shape_circ == True:
-                pix_dists = arclength_sphere(theta_pix, 
-                                             phi_pix, 
-                                             theta_cent, 
-                                             phi_cent)
-                profile = gaussian_source_circ(pix_dists, FWHM_maj[i])
-            else:
-                profile = gaussian_source((theta_pix, theta_cent),
+
+            profile = gaussian_source((theta_pix, theta_cent),
                                           (phi_pix, phi_cent),
                                           FWHM_maj[i],
                                           FWHM_min[i],
                                           pos_ang[i])
+            profiles.append(profile)
+            sources.append(pix_circ)
+        self.profiles = profiles
+        self.sources = sources
 
-            flux_profile = scaled_flux[i] * profile
-            self.map[pix_circ] += flux_profile # Jy
+    def cold_clumps_spectral(self, maptype, store_maps = False, outdir = ""):
+
+        if maptype == 'temp':
+            spectral_property = self.temperatures
+            output_units = u.K
+        elif maptype == 'beta':
+            spectral_property = self.betas
+            output_units = u.dimensionless_unscaled
+
+        m = self.map.copy()
+        for i in range(self.Nsources):
+            source_profile = spectral_property[i] * self.profiles[i]
+
+            m[self.sources[i]] += source_profile 
+            
+        if store_maps == True:
+            hp.write_map(outdir + str(freq_out) + "_GHz_GCC_" + str(maptype) + "_Map.fits", m = m, coord = "G", column_units = str(output_units), overwrite = True)
+            
+        return m
+        
+    def cold_clumps_flux(self, freq_out, output_units = u.uK_CMB,
+                  store_maps = False, outdir = ""):
+        
+        # Original flux values at 353 GHz
+        if freq_out == 353:
+            scaled_flux = self.flux_353
+        elif freq_out == 545:
+            scaled_flux = self.flux_545
+        elif freq_out == 857:
+            scaled_flux = self.flux_857
+        else: 
+            scaled_flux = modBB(np.array(self.flux_353), 
+                                self.temperatures, 
+                                freq_out, 
+                                353, 
+                                self.betas)
+        m = self.map.copy()
+        for i in range(self.Nsources):
+            source_profile = scaled_flux[i] * self.profiles[i]
+            m[self.sources[i]] += source_profile # Jy
+
             
         # Convert map from Jy -> Jy/sr with appropriate pix area
-        self.map *= self.per_pix_steradian # Jy/sr
+        m *= self.per_pix_steradian # Jy/sr
         
-        if output_units == u.uK_CMB or output_units == u.K_CMB:
-            self.map = (self.map * u.Jy/u.sr).to_value(output_units, equivalencies = u.cmb_equivalencies(freq_out * u.GHz))
-        else:
-            self.map = (self.map * u.Jy/u.sr).to_value(output_units)
-        
+        m = map_unit_conversion(m * u.Jy / u.sr, output_units)
+
         if store_maps == True:
-            hp.write_map(outdir + str(freq_out) + "_GHz_GCC_Map.fits", m = self.map, coord = "G", column_units = str(output_units), overwrite = True)
-            return self.map
-        else:
-            return self.map
+            hp.write_map(outdir + str(freq_out) + "_GHz_GCC_Map.fits", m = m, coord = "G", column_units = str(output_units), overwrite = True)
+
+        return m
