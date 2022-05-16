@@ -70,6 +70,29 @@ class build_galactic_clump_map(object):
             sources.append(pix_circ)
         self.profiles = profiles
         self.sources = sources
+        
+    def mask_sources(self, threshold = 1e-2, store_maps = False, outdir = ""):
+        m = self.map.copy() + 1
+        
+        flatprofiles = []
+        for i in range(self.Nsources):
+            maskval = []
+            for j in range(len(self.profiles[i])):
+                val = self.profiles[i][j]
+                if val <= threshold:
+                    val = 1
+                elif val >= threshold:
+                    val = 0
+                maskval.append(val)
+            flatprofiles.append(maskval)
+        
+        for i in range(self.Nsources):
+            m[self.sources[i]] *= flatprofiles[i]
+        
+        if store_maps == True:
+            hp.write_map(outdir + "PGCC_Source_Mask.fits", m = m, coord = "G",
+                         overwrite = True)
+        return m
 
     def cold_clumps_spectral(self, maptype, store_maps = False, outdir = ""):
 
