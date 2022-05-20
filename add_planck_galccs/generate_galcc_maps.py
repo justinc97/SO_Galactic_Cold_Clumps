@@ -126,10 +126,10 @@ class build_galactic_clump_map(object):
             scaled_flux = self.flux_857
         else: 
             scaled_flux = modBB(np.array(self.flux_353), 
-                                self.temperatures, 
+                                np.array(self.temperatures), 
                                 freq_out, 
                                 353, 
-                                self.betas)
+                                np.array(self.betas))
         m = self.map.copy()
         for i in range(self.Nsources):
             source_profile = scaled_flux[i] * self.profiles[i]
@@ -139,7 +139,7 @@ class build_galactic_clump_map(object):
         # Convert map from Jy -> Jy/sr with appropriate pix area
         m *= self.per_pix_steradian # Jy/sr
         
-        m = map_unit_conversion(m * u.Jy / u.sr, output_units)
+        m = map_unit_conversion(m * u.Jy / u.sr, freq_out, output_units)
 
         if store_maps == True:
             hp.write_map(outdir + str(freq_out) + "_GHz_GCC_Map.fits", m = m, coord = "G", column_units = str(output_units), overwrite = True)

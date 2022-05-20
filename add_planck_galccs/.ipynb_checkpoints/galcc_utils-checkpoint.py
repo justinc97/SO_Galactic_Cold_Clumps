@@ -19,10 +19,10 @@ def modBB(F0, T, v, v0, b):
         F    : Flux scaled to frequency out
     """
     bb = BlackBody(temperature = T * u.K)
-    Bnu = bb(v) 
-    Bnu0 = bb(v0)
-    vvb = (int(v) / int(v0)) ** b
-    F = F0 * (Bnu / Bnu0) * vvb
+    Bnu = bb(v * u.GHz) 
+    Bnu0 = bb(v0 * u.GHz)
+    vvb = ((v * u.GHz) / (v0 * u.GHz)) ** b
+    F = (F0 * u.Jy) * (Bnu / Bnu0) * vvb
     
     return F.value
 
@@ -68,7 +68,7 @@ def gaussian_source(theta_set, phi_set, a, b, rot):
     return np.exp(-0.5 * ((A**2 / (siga**2)) + (B**2 / (sigb**2))))
 
 
-def map_unit_conversion(m, output_units):
+def map_unit_conversion(m, freq_out, output_units):
     if output_units == u.uK_CMB or output_units == u.K_CMB:
         m = (m).to_value(output_units, equivalencies = u.cmb_equivalencies(freq_out * u.GHz))
     else:
