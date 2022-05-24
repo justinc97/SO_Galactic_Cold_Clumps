@@ -2,6 +2,8 @@ import numpy as np
 import healpy as hp
 import pysm3.units as u
 from astropy.modeling.models import BlackBody
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -69,8 +71,22 @@ def gaussian_source(theta_set, phi_set, a, b, rot):
 
 
 def map_unit_conversion(m, freq_out, output_units):
-    if output_units == u.uK_CMB or output_units == u.K_CMB:
+    if output_units == u.uK_CMB or output_units == u.K_CMB or output_units == u.uK_RJ or output_units == u.K_RJ:
         m = (m).to_value(output_units, equivalencies = u.cmb_equivalencies(freq_out * u.GHz))
     else:
         m = (m).to_value(output_units)
     return m
+
+def plot_compare(original_map, source_added_map, maptype, 
+                 rot, reso, xsize, ysize, unit):
+    gs = gridspec.GridSpec(2,2)
+    plt.figure(figsize = (12, 12,))
+    ax = plt.subplot(gs[0, 0])
+    hp.gnomview(original_map, rot = rot, reso = reso, xsize = xsize,
+                ysize = ysize, title = "Base map (" + maptype + ")", 
+                unit = unit, cmap = "RdBu", hold = True)
+    ax = plt.subplot(gs[0, 1])
+    hp.gnomview(source_added_map, rot = rot, reso = reso, xsize = xsize,
+                ysize = ysize, title = "Sources Added (" + maptype + ")", 
+                unit = unit, cmap = "RdBu", hold = True);
+    return
