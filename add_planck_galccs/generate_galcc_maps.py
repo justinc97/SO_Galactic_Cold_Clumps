@@ -52,6 +52,7 @@ class build_galactic_clump_map(object):
         FWHM_maj = (np.array(df['gau_major_axis']) * u.arcmin).to_value(u.rad)
         FWHM_min = (np.array(df['gau_minor_axis']) * u.arcmin).to_value(u.rad)
         pos_ang = df['gau_position_angle']
+        self.solid_ang = 1 / ((np.pi / 4) * (FWHM_maj * FWHM_min))
         
         profiles = []
         sources = []
@@ -131,14 +132,16 @@ class build_galactic_clump_map(object):
                                 353, 
                                 np.array(self.betas))
         m = self.map.copy()
+        sources_limited = []
         for i in range(self.Nsources):
-            source_profile = scaled_flux[i] * self.profiles[i]
-            m[self.sources[i]] += source_profile # Jy
-
+            source_profile = scaled_flux[i] * self.profiles[i] * self.solid_ang[i]
+            source_limit = [i for i,v in enumerate(source_profile) if v > 1e-5]
+            source_profile_limit = source_profile[source_limit]
+            source_shape_limit = self.sources[i][source_limit]
+            sources_limited.append(source_shape_limit)
             
-        # Convert map from Jy -> Jy/sr with appropriate pix area
-        m *= self.per_pix_steradian # Jy/sr
-        
+            m[source_shape_limit] += source_profile_limit # Jy/sr
+            
         m = map_unit_conversion(m * u.Jy / u.sr, freq_out, output_units)
 
         if store_maps == True:
