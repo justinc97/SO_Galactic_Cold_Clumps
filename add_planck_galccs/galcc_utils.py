@@ -1,5 +1,7 @@
 import numpy as np
 import healpy as hp
+import pysm3
+import pandas as pd
 import pysm3.units as u
 from astropy.modeling.models import BlackBody
 import matplotlib.pyplot as plt
@@ -77,16 +79,17 @@ def map_unit_conversion(m, freq_out, output_units):
         m = (m).to_value(output_units)
     return m
 
-def plot_compare(original_map, source_added_map, maptype, 
-                 rot, reso, xsize, ysize, unit):
+def plot_compare(original_map, source_added_map, maptype, **kwargs):
     gs = gridspec.GridSpec(2,2)
     plt.figure(figsize = (12, 12,))
     ax = plt.subplot(gs[0, 0])
-    hp.gnomview(original_map, rot = rot, reso = reso, xsize = xsize,
-                ysize = ysize, title = "Base map (" + maptype + ")", 
-                unit = unit, cmap = "RdBu", hold = True)
+    hp.gnomview(original_map, 
+                title = "Base map (" + maptype + ")", 
+                cmap = "RdBu", hold = True, **kwargs)
     ax = plt.subplot(gs[0, 1])
-    hp.gnomview(source_added_map, rot = rot, reso = reso, xsize = xsize,
-                ysize = ysize, title = "Sources Added (" + maptype + ")", 
-                unit = unit, cmap = "RdBu", hold = True);
+    hp.gnomview(source_added_map, 
+                title = "Sources Added (" + maptype + ")", 
+                cmap = "RdBu", hold = True, **kwargs);
     return
+
+

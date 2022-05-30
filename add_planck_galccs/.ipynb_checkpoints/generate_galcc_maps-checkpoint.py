@@ -1,13 +1,15 @@
 import numpy as np
 import healpy as hp
 import pandas as pd
+import pysm3
 import pysm3.units as u
 import os
 from .galcc_utils import (modBB, 
                           arclength_sphere, 
                           gaussian_source,
                           gaussian_source_circ,
-                          map_unit_conversion
+                          map_unit_conversion,
+                          plot_compare
 )
 
 
@@ -95,7 +97,7 @@ class build_galactic_clump_map(object):
                          overwrite = True)
         return m
 
-    def cold_clumps_spectral(self, maptype, store_maps = False, outdir = ""):
+    def cold_clumps_spectral(self, maptype, ellipse_lim = 1e-5, store_maps = False, outdir = ""):
 
         if maptype == 'temp':
             spectral_property = self.temperatures
@@ -105,15 +107,25 @@ class build_galactic_clump_map(object):
             output_units = u.dimensionless_unscaled
 
         m = self.map.copy()
+        sources_limited = []
         for i in range(self.Nsources):
             source_profile = spectral_property[i] * self.profiles[i]
+            source_limit = [i for i,v in enumerate(source_profile) if v > ellipse_lim]
+            source_profile_limit = source_profile[source_limit]
+            source_shape_limit = self.sources[i][source_limit]
+            sources_limited.append(source_shape_limit)
+            
+            m[source_shape_limit] += source_profile_limit
+            
+        #for i in range(self.Nsources):
+            #source_profile = spectral_property[i] * self.profiles[i]
 
-            m[self.sources[i]] += source_profile 
+            #m[self.sources[i]] += source_profile 
             
         if store_maps == True:
             hp.write_map(outdir + str(freq_out) + "_GHz_GCC_" + str(maptype) + "_Map.fits", m = m, coord = "G", column_units = str(output_units), overwrite = True)
             
-        return m
+        return m, sources_limited
         
     def cold_clumps_flux(self, freq_out, output_units = u.uK_CMB,
                   store_maps = False, outdir = ""):
@@ -135,7 +147,7 @@ class build_galactic_clump_map(object):
         sources_limited = []
         for i in range(self.Nsources):
             source_profile = scaled_flux[i] * self.profiles[i] * self.solid_ang[i]
-            source_limit = [i for i,v in enumerate(source_profile) if v > 1e-5]
+            source_limit = [i for i,v in enumerate(source_profile) if v > 1e-3]
             source_profile_limit = source_profile[source_limit]
             source_shape_limit = self.sources[i][source_limit]
             sources_limited.append(source_shape_limit)
@@ -148,3 +160,42 @@ class build_galactic_clump_map(object):
             hp.write_map(outdir + str(freq_out) + "_GHz_GCC_Map.fits", m = m, coord = "G", column_units = str(output_units), overwrite = True)
 
         return m
+
+    
+def add_PGCC2PySM(nside, freq, output_units, sky_model, catalogue, **kwargs):
+    # Build base PGCC map
+    PGCCmap = build_galactic_clump_map(nside = 2048, catalogue = catalogue)
+    I_map = PGCCmap.cold_clumps_flux(freq_out = freq, store_maps = False, output_units = u.MJy/u.sr)
+    Td_map, _ = PGCCmap.cold_clumps_spectral(maptype = 'temp', store_maps = False)
+    bd_map, _ = PGCCmap.cold_clumps_spectral(maptype = 'beta', store_maps = False)
+    
+    # Build PySM map
+    sky = pysm3.Sky(nside = nside, component_config = sky_model)
+    sky_emission = sky.get_emission(freq * u.GHz)
+    sky_emission = sky_emission.to(output_units, equivalencies = u.cmb_equivalencies(freq * u.GHz))
+    dust = sky.components[0]
+    Td_PySM = dust.mbb_temperature
+    bd_PySM = dust.mbb_index
+    
+    PGCC_PySM_I = sky_emission[0].copy().value
+    PGCC_PySM_I += I_map
+    plot_compare(sky_emission[0], PGCC_PySM_I, 
+                 maptype = str("Dust Emission [PySM " + sky_model + " " + str(freq) + " GHz]"),
+                 **kwargs)
+
+    if hasattr(Td_PySM.value, "__len__"):
+        PGCC_PySM_Td = Td_PySM.copy().value
+        PGCC_PySM_Td += Td_map
+        plot_compare(Td_PySM, PGCC_PySM_Td,
+                     maptype = "$T_{dust}$ [PySM " + sky_model + " ]",
+                     **kwargs)
+    else: print("Td is a constant = ", Td_PySM)
+    if hasattr(bd_PySM.value, "__len__"):
+        PGCC_PySM_bd = bd_PySM.copy().value
+        PGCC_PySM_bd += bd_map
+        plot_compare(bd_PySM, PGCC_PySM_bd, 
+                    maptype = "$\\beta_{dust}$ [PySM " + sky_model + " ]",
+                    **kwargs)
+    else: print("bd is a constant = ", bd_PySM)
+
+    return
