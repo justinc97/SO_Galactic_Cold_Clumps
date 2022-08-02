@@ -74,7 +74,7 @@ class build_galactic_clump_map(object):
         self.profiles = profiles
         self.sources = sources
         
-    def mask_sources(self, threshold = 1e-2, store_maps = False, outdir = ""):
+    def mask_sources(self, threshold = 1e-5, store_maps = False, outdir = ""):
         m = self.map.copy() + 1
         
         flatprofiles = []
