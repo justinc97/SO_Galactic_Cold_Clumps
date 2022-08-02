@@ -46,8 +46,6 @@ class build_galactic_clump_map(object):
         self.temperatures = np.array(df['temp_clump'])
         self.betas        = np.array(df['beta_clump'])
         self.flux_353     = np.array(df['flux_353_clump'])
-        self.flux_545     = np.array(df['flux_545_clump'])
-        self.flux_857     = np.array(df['flux_857_clump'])
         
         # Read source position, shape and orientation
         vecs = hp.ang2vec(df['glon'], df['glat'], lonlat = True)
@@ -133,10 +131,6 @@ class build_galactic_clump_map(object):
         # Original flux values at 353 GHz
         if freq_out == 353:
             scaled_flux = self.flux_353
-        elif freq_out == 545:
-            scaled_flux = self.flux_545
-        elif freq_out == 857:
-            scaled_flux = self.flux_857
         else: 
             scaled_flux = modBB(np.array(self.flux_353), 
                                 np.array(self.temperatures), 
