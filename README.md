@@ -5,6 +5,8 @@ Galactic Cold Clump map generation and frequency scale script for Simons Observa
 
 Source flux can be scaled from default measurement at Planck 353 GHz to frequencies necessary for SO and other CMB observatories.
 
+The `SPoCC.ipynb` workbook is a step by step example of taking hte Planck Galactic Cold Clump Catalogue, observing the distribution of the key parameters and simulating new cold clumps from this information to populate maps at generalised frequencies in I, Q and U for injecting these sources into PySM3 Galactic dust simulations.
+
 The `Test_Notebook.ipynb` workbook guides through the functions available in the module including generation of maps with PGCC sources, adding sources to dust maps to observe their position, shape, scale, orientationm etc., comparing various dust maps such as GNILC, Commander and other PySM3 template dust sky models. The notebook also shows how we can measure the polarisation fraction around these sources.
 Finally it demonstrates scaling the flux of sources to new frequencies such as those to be utilised by SO.
 
